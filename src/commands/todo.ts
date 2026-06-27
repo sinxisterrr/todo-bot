@@ -102,6 +102,21 @@ export async function handleTodo(interaction: ChatInputCommandInteraction) {
     }
   }
 
+  // Store had no record (e.g. after redeploy) — scan existing threads before creating a new one
+  if (!todoThread) {
+    const active = await forumChannel.threads.fetchActive();
+    todoThread = (active.threads.find(t => t.name === '📋 To-Do List') ?? null) as ThreadChannel | null;
+
+    if (!todoThread) {
+      const archived = await forumChannel.threads.fetchArchived({ type: 'public' });
+      todoThread = (archived.threads.find(t => t.name === '📋 To-Do List') ?? null) as ThreadChannel | null;
+    }
+
+    if (todoThread) {
+      store.setTodoThread(guildId, forumChannel.id, todoThread.id);
+    }
+  }
+
   if (!todoThread) {
     todoThread = await forumChannel.threads.create({
       name: '📋 To-Do List',
