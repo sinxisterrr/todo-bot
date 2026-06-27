@@ -10,7 +10,7 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
-client.once('ready', () => {
+client.once('clientReady', () => {
   console.log(`Ready: ${client.user?.tag}`);
 });
 
