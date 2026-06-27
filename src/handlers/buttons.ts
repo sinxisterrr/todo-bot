@@ -4,9 +4,53 @@ import {
   ButtonBuilder,
   ButtonStyle,
   GuildMember,
+  ComponentType,
+  ThreadChannel,
 } from 'discord.js';
-import { store } from '../store';
+import { store, TodoItem } from '../store';
 import { formatTimestamp, buildItemContent } from '../utils';
+
+function reconstructItem(itemId: string, interaction: ButtonInteraction): TodoItem | null {
+  const msg = interaction.message;
+  const content = msg.content;
+
+  const checked = content.startsWith('✅');
+  const textMatch = checked
+    ? content.match(/^✅ ~~(.+?)~~/)
+    : content.match(/^☐ \*\*(.+?)\*\*/);
+  if (!textMatch) return null;
+
+  const addedMatch = content.match(/Added by \*\*(.+?)\*\* • (.+)/m);
+  if (!addedMatch) return null;
+
+  let discussionThreadId: string | undefined;
+  for (const row of msg.components) {
+    for (const comp of row.components) {
+      if (comp.type === ComponentType.Button && 'url' in comp && comp.url) {
+        const urlMatch = (comp.url as string).match(/channels\/\d+\/(\d+)$/);
+        if (urlMatch) discussionThreadId = urlMatch[1];
+      }
+    }
+  }
+
+  const guildId = interaction.guildId!;
+  const todoThreadId = msg.channelId;
+  const channelId = (msg.channel as ThreadChannel).parentId ?? '';
+
+  return {
+    itemId,
+    messageId: msg.id,
+    guildId,
+    channelId,
+    todoThreadId,
+    discussionThreadId,
+    itemText: textMatch[1],
+    addedById: '',
+    addedByName: addedMatch[1],
+    addedAt: addedMatch[2].split('\n')[0].trim(),
+    checked,
+  };
+}
 
 export async function handleButton(interaction: ButtonInteraction) {
   const [action, itemId] = interaction.customId.split(':');
@@ -14,10 +58,14 @@ export async function handleButton(interaction: ButtonInteraction) {
 
   await interaction.deferUpdate();
 
-  const item = store.getItem(itemId);
+  let item = store.getItem(itemId);
   if (!item) {
-    await interaction.followUp({ content: 'Could not find this item.', ephemeral: true });
-    return;
+    item = reconstructItem(itemId, interaction);
+    if (!item) {
+      await interaction.followUp({ content: 'Could not find this item.', ephemeral: true });
+      return;
+    }
+    store.saveItem(item);
   }
 
   const displayName = (interaction.member as GuildMember)?.displayName ?? interaction.user.username;
