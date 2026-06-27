@@ -25,9 +25,10 @@ function reconstructItem(itemId: string, interaction: ButtonInteraction): TodoIt
 
   let discussionThreadId: string | undefined;
   for (const row of msg.components) {
+    if (row.type !== ComponentType.ActionRow) continue;
     for (const comp of row.components) {
-      if (comp.type === ComponentType.Button && 'url' in comp && comp.url) {
-        const urlMatch = (comp.url as string).match(/channels\/\d+\/(\d+)$/);
+      if (comp.type === ComponentType.Button && comp.url) {
+        const urlMatch = comp.url.match(/channels\/\d+\/(\d+)$/);
         if (urlMatch) discussionThreadId = urlMatch[1];
       }
     }
@@ -60,12 +61,13 @@ export async function handleButton(interaction: ButtonInteraction) {
 
   let item = store.getItem(itemId);
   if (!item) {
-    item = reconstructItem(itemId, interaction);
-    if (!item) {
+    const reconstructed = reconstructItem(itemId, interaction);
+    if (!reconstructed) {
       await interaction.followUp({ content: 'Could not find this item.', ephemeral: true });
       return;
     }
-    store.saveItem(item);
+    store.saveItem(reconstructed);
+    item = reconstructed;
   }
 
   const displayName = (interaction.member as GuildMember)?.displayName ?? interaction.user.username;
