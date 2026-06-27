@@ -6,12 +6,15 @@ dotenv.config();
 const commands = [
   new SlashCommandBuilder()
     .setName('todo')
-    .setDescription("Add a to-do item to this channel's pinned list")
+    .setDescription("Add a to-do item to a forum channel's list")
+    .addStringOption(opt =>
+      opt.setName('item').setDescription('What needs doing').setRequired(true)
+    )
     .addStringOption(opt =>
       opt
-        .setName('item')
-        .setDescription('What needs doing')
-        .setRequired(true)
+        .setName('channel')
+        .setDescription('Forum channel to add to (defaults to current channel)')
+        .setAutocomplete(true)
     )
     .toJSON(),
 ];

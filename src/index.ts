@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import dotenv from 'dotenv';
-import { handleTodo } from './commands/todo';
+import { handleTodo, handleTodoAutocomplete } from './commands/todo';
 import { handleButton } from './handlers/buttons';
 
 dotenv.config();
@@ -8,9 +8,15 @@ dotenv.config();
 const commands = [
   new SlashCommandBuilder()
     .setName('todo')
-    .setDescription("Add a to-do item to this channel's pinned list")
+    .setDescription("Add a to-do item to a forum channel's list")
     .addStringOption(opt =>
       opt.setName('item').setDescription('What needs doing').setRequired(true)
+    )
+    .addStringOption(opt =>
+      opt
+        .setName('channel')
+        .setDescription('Forum channel to add to (defaults to current channel)')
+        .setAutocomplete(true)
     )
     .toJSON(),
 ];
@@ -41,7 +47,9 @@ client.once('clientReady', async (c) => {
 
 client.on('interactionCreate', async (interaction) => {
   try {
-    if (interaction.isChatInputCommand() && interaction.commandName === 'todo') {
+    if (interaction.isAutocomplete() && interaction.commandName === 'todo') {
+      await handleTodoAutocomplete(interaction);
+    } else if (interaction.isChatInputCommand() && interaction.commandName === 'todo') {
       await handleTodo(interaction);
     } else if (interaction.isButton()) {
       await handleButton(interaction);

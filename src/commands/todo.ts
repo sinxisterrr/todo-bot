@@ -1,5 +1,6 @@
 import {
   ChatInputCommandInteraction,
+  AutocompleteInteraction,
   ChannelType,
   ChannelFlags,
   ThreadAutoArchiveDuration,
@@ -17,26 +18,76 @@ function getDisplayName(interaction: ChatInputCommandInteraction): string {
   return (interaction.member as GuildMember)?.displayName ?? interaction.user.username;
 }
 
+function normalizeForSearch(name: string): string {
+  // Strip leading emoji/symbols like "👖│" to get the plain channel name
+  return name.replace(/^[\s\S]*?│/, '').trim().toLowerCase();
+}
+
+export async function handleTodoAutocomplete(interaction: AutocompleteInteraction) {
+  const focused = interaction.options.getFocused().toLowerCase();
+  const guild = interaction.guild;
+  if (!guild) return interaction.respond([]);
+
+  // Find the category the command is being run from
+  const channel = interaction.channel;
+  let categoryId: string | null = null;
+
+  if (channel?.type === ChannelType.PublicThread || channel?.type === ChannelType.PrivateThread) {
+    // Inside a forum post: thread → forum → category
+    const thread = channel as ThreadChannel;
+    categoryId = thread.parent?.parentId ?? null;
+  } else if (channel && 'parentId' in channel) {
+    categoryId = (channel as any).parentId ?? null;
+  }
+
+  if (!categoryId) return interaction.respond([]);
+
+  const allChannels = await guild.channels.fetch();
+  const results = [...allChannels.values()]
+    .filter(ch => {
+      if (!ch || ch.type !== ChannelType.GuildForum) return false;
+      if ((ch as ForumChannel).parentId !== categoryId) return false;
+      const raw = ch.name.toLowerCase();
+      const normalized = normalizeForSearch(ch.name);
+      return !focused || raw.includes(focused) || normalized.includes(focused);
+    })
+    .map(ch => ({ name: ch!.name, value: ch!.id }))
+    .slice(0, 25);
+
+  await interaction.respond(results);
+}
+
 export async function handleTodo(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ ephemeral: true });
 
   const itemText = interaction.options.getString('item', true).trim();
+  const targetChannelId = interaction.options.getString('channel');
   const displayName = getDisplayName(interaction);
   const addedAt = formatTimestamp(new Date());
   const guildId = interaction.guildId!;
 
-  // Resolve which forum channel this command is coming from
-  const channel = interaction.channel;
-  if (!channel) return interaction.editReply('Could not resolve channel.');
+  let forumChannel: ForumChannel;
 
-  // Slash commands in forum channels are always run from within a thread (post)
-  if (
-    (channel.type !== ChannelType.PublicThread && channel.type !== ChannelType.PrivateThread) ||
-    channel.parent?.type !== ChannelType.GuildForum
-  ) {
-    return interaction.editReply('This command only works inside forum channel posts.');
+  if (targetChannelId) {
+    const fetched = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
+    if (!fetched || fetched.type !== ChannelType.GuildForum) {
+      return interaction.editReply('Could not find the specified forum channel.');
+    }
+    forumChannel = fetched as ForumChannel;
+  } else {
+    const channel = interaction.channel;
+    if (!channel) return interaction.editReply('Could not resolve channel.');
+
+    if (
+      (channel.type !== ChannelType.PublicThread && channel.type !== ChannelType.PrivateThread) ||
+      channel.parent?.type !== ChannelType.GuildForum
+    ) {
+      return interaction.editReply(
+        'Use this command inside a forum post, or pick a channel from the `channel` option.'
+      );
+    }
+    forumChannel = channel.parent as ForumChannel;
   }
-  const forumChannel = channel.parent as ForumChannel;
 
   // Find or create the pinned to-do thread for this forum channel
   let todoThreadId = store.getTodoThread(guildId, forumChannel.id);
@@ -67,7 +118,6 @@ export async function handleTodo(interaction: ChatInputCommandInteraction) {
 
   if (todoThread.archived) await todoThread.setArchived(false);
 
-  // Create a discussion forum post for this specific item
   const threadName = itemText.length > 100 ? itemText.slice(0, 97) + '...' : itemText;
   const discussionThread = await forumChannel.threads.create({
     name: threadName,
@@ -80,7 +130,6 @@ export async function handleTodo(interaction: ChatInputCommandInteraction) {
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
   });
 
-  // Post the item to the to-do thread
   const itemId = generateId();
   const content = buildItemContent(itemText, displayName, addedAt, false);
   const discussionUrl = `https://discord.com/channels/${guildId}/${discussionThread.id}`;
@@ -117,7 +166,8 @@ export async function handleTodo(interaction: ChatInputCommandInteraction) {
     checked: false,
   });
 
+  const channelMention = targetChannelId ? ` to <#${forumChannel.id}>` : '';
   await interaction.editReply(
-    `Added **"${itemText}"** to the list and created a discussion thread!`
+    `Added **"${itemText}"**${channelMention} and created a discussion thread!`
   );
 }
