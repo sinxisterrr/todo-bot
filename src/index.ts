@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import dotenv from 'dotenv';
 import { handleTodo, handleTodoAutocomplete } from './commands/todo';
+import { handleAdd } from './commands/add';
 import { handleButton } from './handlers/buttons';
 
 dotenv.config();
@@ -17,6 +18,13 @@ const commands = [
         .setName('channel')
         .setDescription('Forum channel to add to (defaults to current channel)')
         .setAutocomplete(true)
+    )
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('add')
+    .setDescription("Add a sub-task to the top message of this forum thread")
+    .addStringOption(opt =>
+      opt.setName('item').setDescription('The sub-task to add').setRequired(true)
     )
     .toJSON(),
 ];
@@ -51,6 +59,8 @@ client.on('interactionCreate', async (interaction) => {
       await handleTodoAutocomplete(interaction);
     } else if (interaction.isChatInputCommand() && interaction.commandName === 'todo') {
       await handleTodo(interaction);
+    } else if (interaction.isChatInputCommand() && interaction.commandName === 'add') {
+      await handleAdd(interaction);
     } else if (interaction.isButton()) {
       await handleButton(interaction);
     }
