@@ -23,9 +23,9 @@ const commands = [
     .toJSON(),
   new SlashCommandBuilder()
     .setName('add')
-    .setDescription("Add a sub-task to this post's to-do list")
+    .setDescription("Add a sub-task to the top message of this forum thread")
     .addStringOption(opt =>
-      opt.setName('item').setDescription('What needs doing').setRequired(true)
+      opt.setName('item').setDescription('The sub-task to add').setRequired(true)
     )
     .toJSON(),
 ];
