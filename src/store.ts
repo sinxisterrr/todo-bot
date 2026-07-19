@@ -18,19 +18,39 @@ export interface TodoItem {
   checkedAt?: string;
 }
 
+export interface PostTodoItem {
+  itemId: string;
+  itemText: string;
+  addedByName: string;
+  addedAt: string;
+  checked: boolean;
+  checkedByName?: string;
+  checkedAt?: string;
+}
+
+export interface PostTodoList {
+  messageId: string;
+  threadId: string;
+  guildId: string;
+  items: PostTodoItem[];
+}
+
 interface StoreData {
-  todoThreads: Record<string, string>; // `${guildId}:${channelId}` -> threadId
-  items: Record<string, TodoItem>;     // itemId -> item
+  todoThreads: Record<string, string>;       // `${guildId}:${channelId}` -> threadId
+  items: Record<string, TodoItem>;           // itemId -> item
+  postTodoLists: Record<string, PostTodoList>; // `${guildId}:${threadId}` -> list
 }
 
 const storePath = path.join(__dirname, '../data/store.json');
 
 function load(): StoreData {
-  if (!fs.existsSync(storePath)) return { todoThreads: {}, items: {} };
+  if (!fs.existsSync(storePath)) return { todoThreads: {}, items: {}, postTodoLists: {} };
   try {
-    return JSON.parse(fs.readFileSync(storePath, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(storePath, 'utf8'));
+    if (!data.postTodoLists) data.postTodoLists = {};
+    return data;
   } catch {
-    return { todoThreads: {}, items: {} };
+    return { todoThreads: {}, items: {}, postTodoLists: {} };
   }
 }
 
@@ -67,5 +87,15 @@ export const store = {
       data.items[itemId] = { ...data.items[itemId], ...updates };
       save(data);
     }
+  },
+
+  getPostTodoList(guildId: string, threadId: string): PostTodoList | undefined {
+    return load().postTodoLists[`${guildId}:${threadId}`];
+  },
+
+  setPostTodoList(list: PostTodoList): void {
+    const data = load();
+    data.postTodoLists[`${list.guildId}:${list.threadId}`] = list;
+    save(data);
   },
 };

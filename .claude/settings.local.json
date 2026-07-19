@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(git restore *)",
-      "Bash(node_modules\\\\.bin\\\\tsc --noEmit)"
+      "Bash(node_modules\\\\.bin\\\\tsc --noEmit)",
+      "Bash(mkdir \"d:\\\\ai\\\\code-learner\")",
+      "Bash(mkdir \"d:\\\\ai\\\\code-learner\\\\js\")",
+      "Bash(Start-Process *)",
+      "PowerShell(Start-Process \"d:\\\\ai\\\\code-learner\\\\index.html\")",
+      "Bash(node -e \"const c = require\\('d:/ai/code-learner/js/challenges.js'\\); console.log\\('Python:', c.CHALLENGES ? 'wrong' : 'CHALLENGES not exported'\\); \")",
+      "Bash(node -e \"eval\\(require\\('fs'\\).readFileSync\\('d:/ai/code-learner/js/challenges.js','utf8'\\)\\); console.log\\('Python challenges:', CHALLENGES.python.length\\); console.log\\('TS challenges:', CHALLENGES.typescript.length\\);\")",
+      "Bash(node *)"
     ]
   }
 }
